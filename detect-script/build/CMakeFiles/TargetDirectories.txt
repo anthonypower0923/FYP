@@ -1,0 +1,3 @@
+/Users/anthonypower/finally-year-project/detect-script/build/CMakeFiles/detect-app.dir
+/Users/anthonypower/finally-year-project/detect-script/build/CMakeFiles/edit_cache.dir
+/Users/anthonypower/finally-year-project/detect-script/build/CMakeFiles/rebuild_cache.dir
