@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# ==========================================================================
+#     _   _ _ ____            ____          _____
+#    | | | (_)  _ \ ___ _ __ / ___|___  _ _|_   _| __ __ _  ___ ___ _ __
+#    | |_| | | |_) / _ \ '__| |   / _ \| '_ \| || '__/ _` |/ __/ _ \ '__|
+#    |  _  | |  __/  __/ |  | |__| (_) | | | | || | | (_| | (_|  __/ |
+#    |_| |_|_|_|   \___|_|   \____\___/|_| |_|_||_|  \__,_|\___\___|_|
+#
+#       ---  High-Performance Connectivity Tracer (HiPerConTracer)  ---
+#                 https://www.nntb.no/~dreibh/hipercontracer/
+# ==========================================================================
+#
+# High-Performance Connectivity Tracer (HiPerConTracer)
+# Copyright (C) 2015-2025 by Thomas Dreibholz
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Contact: dreibh@simula.no
+
+# Bash options:
+set -eu
+
+
+if [ $# -ne 2 ] ; then
+   echo >&2 "Usage: $0 mariadb|mongodb|mysql|postgresql users.conf"
+   exit 1
+fi
+if [ ! -e "$2" ] ; then
+   echo >&2 "ERROR: Use configuration $2 does not exist!"
+fi
+
+DOMAIN="test.local"
+DATABASE="just_a_test_database"
+# MAINTAINER_PASSWORD=
+# IMPORTER_PASSWORD=
+RESEARCHER_PASSWORD=
+# shellcheck disable=SC1090
+. "$2"
+
+
+# ###### MySQL/MariaDB ######################################################
+if [ "$1" == "mysql" ] || [ "$1" == "mariadb" ] ; then
+   # Documentation: https://www.digitalocean.com/community/tutorials/how-to-install-mariadb-on-ubuntu-22-04
+   server="mariadb"
+
+   echo -e "\x1b[34m$(date +"%F %H:%M:%S"): Testing access to MySQL/MariaDB database ...\x1b[0m"
+   mysql \
+      --host="${server}.${DOMAIN}" \
+      --port 3306 \
+      --protocol=tcp \
+      --ssl \
+      --ssl-verify-server-cert \
+      --ssl-ca=/etc/ssl/TestLevel1/certs/TestLevel1.crt \
+      --ssl-crl=/etc/ssl/TestGlobal.crl \
+      --user=researcher \
+      --password="${RESEARCHER_PASSWORD}" \
+      --database="${DATABASE}" \
+      <../SQL/mariadb-test.sql
+
+
+# ###### PostgreSQL #########################################################
+elif [ "$1" == "postgresql" ] ; then
+   # Documentation: https://www.digitalocean.com/community/tutorials/how-to-install-postgresql-on-ubuntu-22-04-quickstart
+   server="postgresql"
+
+   echo -e "\x1b[34m$(date +"%F %H:%M:%S"): Testing access to PostgreSQL database ...\x1b[0m"
+   PGPASSWORD="${RESEARCHER_PASSWORD}" \
+   PGSSLMODE="verify-full" \
+   PGSSLROOTCERT="/etc/ssl/TestLevel1/certs/TestLevel1.crt" \
+   PGSSLCRL="/etc/ssl/TestGlobal.crl" \
+   psql \
+      --host="${server}.${DOMAIN}" \
+      --port=5432 \
+      --username=researcher \
+      --dbname="${DATABASE}" \
+      <../SQL/postgresql-test.sql
+
+
+# ###### MongoDB ############################################################
+elif [ "$1" == "mongodb" ] ; then
+   # Documentation: https://www.mongodb.com/docs/manual/tutorial/install-mongodb-on-ubuntu/
+   server="mongodb"
+
+   echo -e "\x1b[34m$(date +"%F %H:%M:%S"): Testing access to MongoDB database ...\x1b[0m"
+   mongosh \
+      "mongodb://${server}.${DOMAIN}:27017/${DATABASE}" \
+      --tls \
+      --tlsDisabledProtocols TLS1_0,TLS1_1,TLS1_2 \
+      --tlsCAFile /etc/ssl/TestLevel1/certs/TestLevel1.crt \
+      --username researcher \
+      --password "${RESEARCHER_PASSWORD}" \
+      --quiet \
+      <../NoSQL/mongodb-test.ms
+   # FIXME! --tlsCRLFile /etc/ssl/TestGlobal.crl
+
+
+# ###### Error ##############################################################
+else
+   echo >&2 "ERROR: Unsupported database: $1"
+   exit 1
+fi

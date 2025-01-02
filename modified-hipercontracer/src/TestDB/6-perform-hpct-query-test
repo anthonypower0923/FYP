@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# ==========================================================================
+#     _   _ _ ____            ____          _____
+#    | | | (_)  _ \ ___ _ __ / ___|___  _ _|_   _| __ __ _  ___ ___ _ __
+#    | |_| | | |_) / _ \ '__| |   / _ \| '_ \| || '__/ _` |/ __/ _ \ '__|
+#    |  _  | |  __/  __/ |  | |__| (_) | | | | || | | (_| | (_|  __/ |
+#    |_| |_|_|_|   \___|_|   \____\___/|_| |_|_||_|  \__,_|\___\___|_|
+#
+#       ---  High-Performance Connectivity Tracer (HiPerConTracer)  ---
+#                 https://www.nntb.no/~dreibh/hipercontracer/
+# ==========================================================================
+#
+# High-Performance Connectivity Tracer (HiPerConTracer)
+# Copyright (C) 2015-2025 by Thomas Dreibholz
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Contact: dreibh@simula.no
+
+# Bash options:
+set -eu
+
+
+if [ $# -ne 2 ] ; then
+   echo >&2 "Usage: $0 mariadb|mongodb|mysql|postgresql users.conf"
+   exit 1
+fi
+if [ ! -e "$2" ] ; then
+   echo >&2 "ERROR: Use configuration $2 does not exist!"
+fi
+
+DATABASE="just_a_test_database"
+# shellcheck disable=SC1090
+. "$2"
+
+DBMS="$1"
+DATABASE_CONFIG="${HOME}/${DATABASE}-researcher-${DBMS}.conf"
+
+if [ ! -v VALGRIND_CMD ] ; then
+   VALGRIND_CMD=""
+fi
+
+
+# ###### Run test ###########################################################
+if [ -e "${DATABASE_CONFIG}" ] ; then
+
+   echo -e "\x1b[34m$(date +"%F %H:%M:%S"): Querying results ...\x1b[0m"
+
+   if [ ! -e good ] || [ ! -e bad ] || [ ! -e data ] ; then
+      echo >&2 "ERROR: Directories missing! Did 5-perform-hpct-importer-test succeed?"
+      exit 1
+   fi
+
+   if [ -x ../hpct-query ] && [ -x ../hpct-query ] ; then
+      # Running in development environment:
+      queryTool="../hpct-query"
+      resultsTool="../hpct-results"
+   else
+      queryTool="hpct-query"
+      resultsTool="hpct-results"
+   fi
+
+   for table in Ping Traceroute ; do   # Jitter
+
+      echo -e "\x1b[33m$(date +"%F %H:%M:%S"): Obtaining ${table} data from good/ directory ...\x1b[0m"
+      find good/ -name "${table}-*.hpct.*" -or -name "${table}-*.results.*" | \
+         "${resultsTool}" --input-file-names-from-stdin -o imported-${table,,}.csv
+      if [ ! -e imported-${table,,}.csv ] ; then
+         echo >&2 "ERROR: There is no ${table} data from good/ directory!"
+         exit 1
+      fi
+
+      echo -e "\x1b[33m$(date +"%F %H:%M:%S"): Querying ${table} data from database ...\x1b[0m"
+      ${VALGRIND_CMD} "${queryTool}" "${DATABASE_CONFIG}" ${table,,} -o queried-${table,,}-"${DBMS}".hpct
+      ${VALGRIND_CMD} "${resultsTool}" queried-${table,,}-"${DBMS}".hpct -o queried-${table,,}-"${DBMS}".csv
+
+      echo -e "\x1b[33m$(date +"%F %H:%M:%S"): Checking for differences in ${table}:\x1b[0m"
+      wc -ml imported-${table,,}.csv
+      wc -ml queried-${table,,}-"${DBMS}".csv
+      if ! diff imported-${table,,}.csv queried-${table,,}-"${DBMS}".csv ; then
+         echo "RESULTS DIFFER!"
+         diff --color=always imported-${table,,}.csv queried-${table,,}-"${DBMS}".csv | head -n32
+         exit 1
+      fi
+
+   done
+
+   echo "SUCCESS!"
+
+
+# ###### Error ##############################################################
+else
+   echo >&2 "ERROR: ${DATABASE_CONFIG} not found!"
+   exit 1
+fi

@@ -1,0 +1,72 @@
+#!/usr/bin/Rscript
+# ==========================================================================
+#     _   _ _ ____            ____          _____
+#    | | | (_)  _ \ ___ _ __ / ___|___  _ _|_   _| __ __ _  ___ ___ _ __
+#    | |_| | | |_) / _ \ '__| |   / _ \| '_ \| || '__/ _` |/ __/ _ \ '__|
+#    |  _  | |  __/  __/ |  | |__| (_) | | | | || | | (_| | (_|  __/ |
+#    |_| |_|_|_|   \___|_|   \____\___/|_| |_|_||_|  \__,_|\___\___|_|
+#
+#       ---  High-Performance Connectivity Tracer (HiPerConTracer)  ---
+#                 https://www.nntb.no/~dreibh/hipercontracer/
+# ==========================================================================
+#
+# High-Performance Connectivity Tracer (HiPerConTracer)
+# Copyright (C) 2015-2025 by Thomas Dreibholz
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Contact: dreibh@simula.no
+
+source("HiPerConTracer.R")
+
+
+# ###### Main program #######################################################
+
+# ====== Handle arguments ===================================================
+if( (length(commandArgs()) >= 1) && ((commandArgs()[2] == "--slave") || (commandArgs()[2] == "--no-echo")) ) {
+   args <- commandArgs(trailingOnly = TRUE)
+   if (length(args) < 1) {
+     stop("Usage: r-ping-example ping-csv-file")
+   }
+   name <- args[1]
+} else {
+   # !!! NOTE: Set name here, for testing interactively in R! !!!
+   name <- "../ping.csv.gz"
+}
+
+# ====== Read input data ====================================================
+data <- readHiPerConTracerPingResultsFromCSV("", name)
+print(colnames(data))
+
+# ====== Processing example =================================================
+for(measurementID in levels(factor(data$MeasurementID))) {
+   for(sourceIP in levels(factor(data$SourceIP))) {
+      for(destinationIP in levels(factor(data$DestinationIP))) {
+         dataSubset <- subset(data,
+                              (data$MeasurementID == measurementID) &
+                              (data$SourceIP == sourceIP) &
+                              (data$DestinationIP == destinationIP))
+         if(length(dataSubset$RTT.App) > 0) {
+            cat(sep="", "Measurement #", measurementID, ":\t",
+                sourceIP, "-", destinationIP, "\t",
+                # Print time range:
+                as.character(anytime(min(dataSubset$Timestamp) / 1000000000)), " - ",
+                as.character(anytime(max(dataSubset$Timestamp) / 1000000000)), "\t",
+                # Print number of Pings:
+                length(dataSubset$RTT.App), " Pings",
+                "\n")
+         }
+      }
+   }
+}

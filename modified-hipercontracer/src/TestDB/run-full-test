@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# ==========================================================================
+#     _   _ _ ____            ____          _____
+#    | | | (_)  _ \ ___ _ __ / ___|___  _ _|_   _| __ __ _  ___ ___ _ __
+#    | |_| | | |_) / _ \ '__| |   / _ \| '_ \| || '__/ _` |/ __/ _ \ '__|
+#    |  _  | |  __/  __/ |  | |__| (_) | | | | || | | (_| | (_|  __/ |
+#    |_| |_|_|_|   \___|_|   \____\___/|_| |_|_||_|  \__,_|\___\___|_|
+#
+#       ---  High-Performance Connectivity Tracer (HiPerConTracer)  ---
+#                 https://www.nntb.no/~dreibh/hipercontracer/
+# ==========================================================================
+#
+# High-Performance Connectivity Tracer (HiPerConTracer)
+# Copyright (C) 2015-2025 by Thomas Dreibholz
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Contact: dreibh@simula.no
+
+# Bash options:
+set -eu
+
+
+# ====== Handle arguments ===================================================
+if [ $# -lt 1 ] ; then
+   echo >&2 "Usage: $0 ALL|mariadb|mongodb|mysql|postgresql [--memcheck|--helgrind] [--really-run-i-know-that-it-may-mess-up-the-system]"
+   exit 1
+fi
+
+if [ "$1" == "ALL" ] ; then
+   shift
+   # shellcheck disable=SC2068
+   $0 mariadb    $@
+   # shellcheck disable=SC2068
+   $0 postgresql $@
+   # shellcheck disable=SC2068
+   $0 mongodb    $@
+   exit 0
+fi
+
+DBMS="$1"
+REALLY_RUN=""
+shift
+while [ $# -gt 0 ] ; do
+   if [ "$1" == "--memcheck" ] ; then
+      export VALGRIND_CMD="valgrind --tool=memcheck --leak-check=full"
+   elif [ "$1" == "--helgrind" ] ; then
+      export VALGRIND_CMD="valgrind --tool=helgrind"
+   elif [ "$1" == "--really-run-i-know-that-it-may-mess-up-the-system" ] ; then
+      REALLY_RUN="$1"
+   else
+      echo >&2 "ERROR: Unknown option $1!"
+      exit 1
+   fi
+   shift
+done
+
+
+# ====== Hostname check =====================================================
+HOSTNAME="$(hostname -s)"
+if [ "${HOSTNAME}" != "localhost" ] && [ "${HOSTNAME}" != "dbtest" ] ; then
+   if [ "${REALLY_RUN}" != "--really-run-i-know-that-it-may-mess-up-the-system" ] ; then
+      echo >&2 "Hostname is not \"localhost\" or \"dbtest\". This script assumes to be run on a TEST SYSTEM only, since it replaces (i.e. erases!) existing installations of PostgreSQL, MariaDB/MySQL and MongoDB!"
+      echo >&2 "Stopping here."
+      exit 1
+   fi
+fi
+
+
+# ====== Find template ======================================================
+template="$(find . -name "*-users.conf.example" | head -n1)"
+if [ ! -e "${template}" ] ; then
+   echo >&2 "ERROR: Configuration template not found!"
+   exit
+fi
+echo "Template is: ${template}"
+. "${template}"
+if [ "${DATABASE}" == "" ] ; then
+   echo >&2 "ERROR: No database name given!"
+   exit 1
+fi
+echo "Database is: ${DATABASE}"
+USERS_CONFIG="${HOME}/${DATABASE}-users.conf"
+echo "Users sonfiguration file is: ${USERS_CONFIG}"
+
+
+# ====== Run full test ======================================================
+./0-make-configurations "${template}" "${USERS_CONFIG}" "${DATABASE}"
+
+# Uninstall existing DBMS first:
+./9-uninstall-database      "${DBMS}" --force-removal-without-confirmation
+
+# Install the DBMS and configure it:
+./1-install-database        "${DBMS}" "${USERS_CONFIG}"
+# Copy the CA certificate and CRL:
+cp /etc/ssl/TestLevel1/certs/TestLevel1.crt /etc/ssl/TestGlobal.crl "${HOME}/"
+
+./2-initialise-database     "${DBMS}" "${USERS_CONFIG}" --force-removal-without-confirmation
+./3-test-database           "${DBMS}" "${USERS_CONFIG}"
+
+# Run importer test:
+./4-clean-database          "${DBMS}" "${USERS_CONFIG}" --force-removal-without-confirmation
+# shellcheck disable=SC2211
+./5-perform-*-importer-test "${DBMS}" "${USERS_CONFIG}"
+./3-test-database           "${DBMS}" "${USERS_CONFIG}"
+# shellcheck disable=SC2211
+./6-perform-*-query-test    "${DBMS}" "${USERS_CONFIG}"
+
+
+echo -e '\x1b[42m*** TEST SUCCESSFULLY FINISHED! ***\x1b[0m'

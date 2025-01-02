@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+# ==========================================================================
+#     _   _ _ ____            ____          _____
+#    | | | (_)  _ \ ___ _ __ / ___|___  _ _|_   _| __ __ _  ___ ___ _ __
+#    | |_| | | |_) / _ \ '__| |   / _ \| '_ \| || '__/ _` |/ __/ _ \ '__|
+#    |  _  | |  __/  __/ |  | |__| (_) | | | | || | | (_| | (_|  __/ |
+#    |_| |_|_|_|   \___|_|   \____\___/|_| |_|_||_|  \__,_|\___\___|_|
+#
+#       ---  High-Performance Connectivity Tracer (HiPerConTracer)  ---
+#                 https://www.nntb.no/~dreibh/hipercontracer/
+# ==========================================================================
+#
+# High-Performance Connectivity Tracer (HiPerConTracer)
+# Copyright (C) 2015-2025 by Thomas Dreibholz
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Contact: dreibh@simula.no
+
+# Bash options:
+set -eu
+
+
+if [ $# -lt 1 ] ; then
+   echo >&2 "Usage: $0 mariadb|mongodb|mysql|postgresql [--force-removal-without-confirmation]"
+   exit 1
+fi
+
+if [ "$2" != "--force-removal-without-confirmation" ] ; then
+   echo -n "WARNING: THIS SCRIPT WILL ERASE THE EXISTING DATABASES. To proceed, type \"I am sure!\": "
+   read -er agree
+   if [ "$agree" != "I am sure!" ] ; then
+      echo "Exiting."
+      exit
+   fi
+fi
+
+
+# ====== Check/set environment variables ====================================
+if [ ! -e /etc/os-release ] ; then
+   echo >&2 "ERROR: /etc/os-release does not exist!"
+   exit 1
+fi
+. /etc/os-release
+
+
+
+# ###### MariaDB ############################################################
+if [ "$1" == "mariadb" ] ; then
+   echo -e "\x1b[34m$(date +"%F %H:%M:%S"): Uninstalling MariaDB ...\x1b[0m"
+
+   if [ "${ID}" == "ubuntu" ] || [ "${ID}" == "debian" ] ; then
+      sudo DEBIAN_FRONTEND=noninteractive apt purge -y mariadb-client mariadb-server mariadb-backup
+   elif [ "${ID}" == "fedora" ] ; then
+      sudo dnf remove -y 'mariadb-*'
+   elif [ "${ID}" == "freebsd" ] ; then
+      sudo service mysql-server stop     || true
+      sudo service mysql-server disable  || true
+      sudo pkg remove -y 'mariadb*-server' || true
+   else
+      echo >&2 "ERROR: Unknown ID ${ID} in /etc/os-release. The installation script may need an update for supporting this system!"
+      exit 1
+   fi
+
+   if [ -d /var/lib/mysql ] ; then
+      sudo rm -rf /var/lib/mysql
+   fi
+   if [ -d /var/db/mysql ] ; then
+      sudo rm -rf /var/db/mysql
+   fi
+
+
+# ###### PostgreSQL #########################################################
+elif [ "$1" == "postgresql" ] ; then
+   echo -e "\x1b[34m$(date +"%F %H:%M:%S"): Uninstalling PostgreSQL ...\x1b[0m"
+
+   if [ "${ID}" == "ubuntu" ] || [ "${ID}" == "debian" ] ; then
+      sudo DEBIAN_FRONTEND=noninteractive apt purge -y 'postgresql-*'
+   elif [ "${ID}" == "fedora" ] ; then
+      sudo dnf remove -y 'postgresql-*'
+   elif [ "${ID}" == "freebsd" ] ; then
+      sudo service postgresql stop || true
+      sudo pkg remove -y 'postgresql*-*' || true
+   else
+      echo >&2 "ERROR: Unknown ID ${ID} in /etc/os-release. The installation script may need an update for supporting this system!"
+      exit 1
+   fi
+
+   if [ -d /var/lib/postgresql ] ; then
+      sudo rm -rf /var/lib/postgresql
+   fi
+   if [ -d /var/lib/pgsql ] ; then
+      sudo rm -rf /var/lib/pgsql
+   fi
+   if [ -d /var/db/postgres ] ; then
+      sudo rm -rf /var/db/postgres
+   fi
+
+
+# ###### MongoDB ############################################################
+elif [ "$1" == "mongodb" ] ; then
+   echo -e "\x1b[34m$(date +"%F %H:%M:%S"): Uninstalling MongoDB ...\x1b[0m"
+
+   if [ "${ID}" == "ubuntu" ] || [ "${ID}" == "debian" ] ; then
+      sudo DEBIAN_FRONTEND=noninteractive apt purge -y 'mongodb-*'
+   elif [ "${ID}" == "fedora" ] ; then
+      sudo dnf remove -y 'mongodb-*'
+   elif [ "${ID}" == "freebsd" ] ; then
+      sudo service mongod stop || true
+      sudo pkg remove -y 'mongodb*' || true
+      sudo npm uninstall mongosh || true
+      sudo rm -f /usr/local/etc/mongodb.conf || true
+   else
+      echo >&2 "ERROR: Unknown ID ${ID} in /etc/os-release. The installation script may need an update for supporting this system!"
+      exit 1
+   fi
+
+   if [ -d /var/lib/mongodb ] ; then
+      sudo rm -rf /var/lib/mongodb
+   fi
+
+# ###### Error ##############################################################
+else
+   echo >&2 "ERROR: Unsupported database: $1"
+   exit 1
+fi

@@ -1,0 +1,7 @@
+db.ping.deleteMany({})
+db.ping.countDocuments()
+db.traceroute.deleteMany({})
+db.traceroute.countDocuments()
+db.jitter.deleteMany({})
+db.jitter.countDocuments()
+quit()

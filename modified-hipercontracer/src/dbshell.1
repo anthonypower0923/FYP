@@ -1,0 +1,82 @@
+.\" ========================================================================
+.\"    _   _ _ ____            ____          _____
+.\"   | | | (_)  _ \ ___ _ __ / ___|___  _ _|_   _| __ __ _  ___ ___ _ __
+.\"   | |_| | | |_) / _ \ '__| |   / _ \| '_ \| || '__/ _` |/ __/ _ \ '__|
+.\"   |  _  | |  __/  __/ |  | |__| (_) | | | | || | | (_| | (_|  __/ |
+.\"   |_| |_|_|_|   \___|_|   \____\___/|_| |_|_||_|  \__,_|\___\___|_|
+.\"
+.\"      ---  High-Performance Connectivity Tracer (HiPerConTracer)  ---
+.\"                https://www.nntb.no/~dreibh/hipercontracer/
+.\" ========================================================================
+.\"
+.\" High-Performance Connectivity Tracer (HiPerConTracer)
+.\" Copyright (C) 2015-2025 by Thomas Dreibholz
+.\"
+.\" This program is free software: you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License as published by
+.\" the Free Software Foundation, either version 3 of the License, or
+.\" (at your option) any later version.
+.\"
+.\" This program is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" along with this program.  If not, see <http://www.gnu.org/licenses/>.
+.\"
+.\" Contact: dreibh@simula.no
+.\"
+.\" ###### Setup ############################################################
+.Dd October 30, 2024
+.Dt dbshell 1
+.Os dbshell
+.\" ###### Name #############################################################
+.Sh NAME
+.Nm dbshell
+.Nd HiPerConTracer Database Shell
+.\" ###### Synopsis #########################################################
+.Sh SYNOPSIS
+.Nm dbshell
+database_configuration
+.Op Fl q | Fl Fl quiet
+.Op Fl d | Fl Fl dry-run
+.Op Fl B Ar file_prefix  | Fl Fl write-dbeaver-config Ar file_prefix
+.\" ###### Description ######################################################
+.Sh DESCRIPTION
+.Nm dbshell
+is a simple script to start a database shell, based on the settings from
+a given database configuration file. It is mainly intended to test database
+access using the configuration files for HPCT Importer and HPCT Query Tool.
+.Pp
+.\" ###### Arguments ########################################################
+.Sh ARGUMENTS
+The following argument may be provided:
+.Bl -tag -width indent
+.It database_configuration
+Sets the name of the database configuration file.
+.It Fl q | Fl Fl quiet
+Quiet mode.
+.It Fl d | Fl Fl dry-run
+Just shows the command-line call to start the database shell, but does not
+execute it.
+.It Fl B Ar file_prefix  | Fl Fl write-dbeaver-config Ar file_prefix
+Write DBeaver configuration files (the configuration file itself, as well as a credentials file) with the given file name prefix.
+.El
+.\" ###### Arguments ########################################################
+.Sh EXAMPLES
+.Bl -tag -width indent
+.It dbshell hipercontracer-importer.conf
+.It dbshell hipercontracer-database.conf \-q
+.It dbshell hipercontracer-importer.conf \-d
+.It dbshell hipercontracer-database.conf \-\-dry-run
+.It dbshell hipercontracer-database.conf \-\-dry-run \-q \-B dbeaver-config
+.El
+.\" ###### Authors ##########################################################
+.Sh AUTHORS
+Thomas Dreibholz
+.br
+https://www.nntb.no/~dreibh/hipercontracer
+.br
+mailto://dreibh@simula.no
+.br
