@@ -50,17 +50,17 @@
 
 
 // ###### Constructor #######################################################
-UDPModule::UDPModule(boost::asio::io_service&                 ioService,
+UDPModule::UDPModule(boost::asio::io_context&                 ioContext,
                      std::map<unsigned short, ResultEntry*>&  resultsMap,
                      const boost::asio::ip::address&          sourceAddress,
                      const uint16_t                           sourcePort,
                      const uint16_t                           destinationPort,
                      std::function<void (const ResultEntry*)> newResultCallback,
                      const unsigned int                       packetSize)
-   : ICMPModule(ioService, resultsMap, sourceAddress, sourcePort, destinationPort,
+   : ICMPModule(ioContext, resultsMap, sourceAddress, sourcePort, destinationPort,
                 newResultCallback,
                 packetSize),
-     RawUDPSocket(IOService, (sourceAddress.is_v6() == true) ? raw_udp::v6() :
+     RawUDPSocket(IOContext, (sourceAddress.is_v6() == true) ? raw_udp::v6() :
                                                                raw_udp::v4() )
 {
    // Overhead: IPv4 Header (20)/IPv6 Header (40) + UDP Header (8)
@@ -394,7 +394,7 @@ void UDPModule::handlePayloadResponse(const int     socketDescriptor,
       // ------ TraceServiceHeader ------------------------------------------
       TraceServiceHeader tsHeader;
       is >> tsHeader;
-      if( (is) && (0x4c4f5645 == MagicNumber) ) {
+      if( (is) && (tsHeader.magicNumber() == MagicNumber) ) {
          recordResult(receivedData, 0, 0, tsHeader.seqNumber(),
                       ((SourceAddress.is_v6()) ? 40 + 8 : 20 + 8 ) + receivedData.MessageLength);
       }
@@ -428,7 +428,7 @@ void UDPModule::handlePayloadResponse(const int     socketDescriptor,
                      // ------ TraceServiceHeader ---------------------------
                      TraceServiceHeader tsHeader;
                      is >> tsHeader;
-                     if( (is) && (0x4c4f5645 == MagicNumber) ) {
+                     if( (is) && (tsHeader.magicNumber() == MagicNumber) ) {
                         recordResult(receivedData,
                                      icmpHeader.type(), icmpHeader.code(),
                                      tsHeader.seqNumber(),

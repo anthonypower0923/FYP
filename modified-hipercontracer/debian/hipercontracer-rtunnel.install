@@ -1,0 +1,3 @@
+usr/bin/hpct-rtunnel
+usr/lib/systemd/system/hpct-rtunnel.service
+usr/share/bash-completion/completions/hpct-rtunnel

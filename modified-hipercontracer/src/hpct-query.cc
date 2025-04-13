@@ -168,140 +168,158 @@ static inline unsigned int mapMeasurementID(
  */
 
 
+// ###### Generic ###########################################################
+#define OUTPUT_ITEM(outputType, timeStampVariable)                             \
+   if( (!deduplication) || (lastTimeStamp != timeStampVariable) ||             \
+         (dedupLastItem != outputString) ) {                                   \
+      if(__builtin_expect(lines == 0, 0)) {                                    \
+         outputStream << "#? HPCT " << outputType << " " << ProgramID << "\n"; \
+      }                                                                        \
+      outputStream << outputString;                                            \
+      if(__builtin_expect(timeStampVariable < lastTimeStamp, 0)) {             \
+         HPCT_LOG(fatal) << "Sorting order violation!";                        \
+         abort();                                                              \
+      }                                                                        \
+      lines++;                                                                 \
+      lastTimeStamp = timeStampVariable;                                       \
+      if(deduplication) {                                                      \
+         dedupLastItem = outputString;                                         \
+      }                                                                        \
+      dedupInProgress = false;                                                 \
+   }                                                                           \
+   else {                                                                      \
+      dedupDuplicatesRemoved++;                                                \
+      dedupInProgress = true;                                                  \
+   }
+
+
 // ###### Ping ##############################################################
-#define OUTPUT_PING_V2                                                                       \
-   if(__builtin_expect(lines == 0, 0)) {                                                     \
-      outputStream << "#? HPCT Ping 2 " << ProgramID << "\n";                                \
-   }                                                                                         \
-   outputStream <<                                                                           \
-      str(boost::format("#P%c %d %s %s %x %d %x %d %d %x %d %d %d %08x %d %d %d %d %d %d\n") \
-         % protocol                                                                          \
-                                                                                             \
-         % measurementID                                                                     \
-         % sourceIP.to_string()                                                              \
-         % destinationIP.to_string()                                                         \
-         % sendTimeStamp                                                                     \
-         % burstSeq                                                                          \
-                                                                                             \
-         % (unsigned int)trafficClass                                                        \
-         % packetSize                                                                        \
-         % responseSize                                                                      \
-         % checksum                                                                          \
-         % sourcePort                                                                        \
-         % destinationPort                                                                   \
-         % status                                                                            \
-                                                                                             \
-         % timeSource                                                                        \
-         % delayAppSend                                                                      \
-         % delayQueuing                                                                      \
-         % delayAppReceive                                                                   \
-         % rttApplication                                                                    \
-         % rttSoftware                                                                       \
-         % rttHardware                                                                       \
-      );                                                                                     \
-   lines++;                                                                                  \
-   lastTimeStamp = sendTimeStamp;
+#define OUTPUT_PING_V2(timeStampVariable) {                                 \
+   const std::string outputString = str(boost::format                       \
+      ("#P%c %d %s %s %x %d %x %d %d %x %d %d %d %08x %d %d %d %d %d %d\n") \
+         % protocol                            \
+                                               \
+         % measurementID                       \
+         % sourceIP.to_string()                \
+         % destinationIP.to_string()           \
+         % sendTimeStamp                       \
+         % burstSeq                            \
+                                               \
+         % (unsigned int)trafficClass          \
+         % packetSize                          \
+         % responseSize                        \
+         % checksum                            \
+         % sourcePort                          \
+         % destinationPort                     \
+         % status                              \
+                                               \
+         % timeSource                          \
+         % delayAppSend                        \
+         % delayQueuing                        \
+         % delayAppReceive                     \
+         % rttApplication                      \
+         % rttSoftware                         \
+         % rttHardware                         \
+      );                                       \
+   OUTPUT_ITEM("Ping 2", timeStampVariable);   \
+}
 
 
 // ###### Traceroute ########################################################
-#define OUTPUT_TRACEROUTE_HEADER_V2                                                          \
-   if(__builtin_expect(lines == 0, 0)) {                                                     \
-      outputStream << "#? HPCT Traceroute 2 " << ProgramID << "\n";                          \
-   }                                                                                         \
-   outputStream <<                                                                           \
-      str(boost::format("#T%c %d %s %s %x %d %d %x %d %x %d %d %x %x\n")                     \
-         % protocol                                                                          \
-                                                                                             \
-         % measurementID                                                                     \
-         % sourceIP.to_string()                                                              \
-         % destinationIP.to_string()                                                         \
-         % timeStamp                                                                         \
-         % roundNumber                                                                       \
-                                                                                             \
-         % totalHops                                                                         \
-                                                                                             \
-         % (unsigned int)trafficClass                                                        \
-         % packetSize                                                                        \
-         % checksum                                                                          \
-         % sourcePort                                                                        \
-         % destinationPort                                                                   \
-         % statusFlags                                                                       \
-                                                                                             \
-         % pathHash                                                                          \
-      );                                                                                     \
-   lines++;                                                                                  \
-   lastTimeStamp = timeStamp;
+#define OUTPUT_TRACEROUTE_HEADER_V2(timeStampVariable) {   \
+   const std::string outputString = str(boost::format      \
+      ("#T%c %d %s %s %x %d %d %x %d %x %d %d %x %x\n")    \
+         % protocol                                        \
+                                                           \
+         % measurementID                                   \
+         % sourceIP.to_string()                            \
+         % destinationIP.to_string()                       \
+         % timeStamp                                       \
+         % roundNumber                                     \
+                                                           \
+         % totalHops                                       \
+                                                           \
+         % (unsigned int)trafficClass                      \
+         % packetSize                                      \
+         % checksum                                        \
+         % sourcePort                                      \
+         % destinationPort                                 \
+         % statusFlags                                     \
+                                                           \
+         % pathHash                                        \
+      );                                                   \
+   OUTPUT_ITEM("Traceroute 2", timeStampVariable);         \
+}
 
-#define OUTPUT_TRACEROUTE_HOP_V2                                                             \
-   outputStream <<                                                                           \
-      str(boost::format("\t%x %d %d %d %08x %d %d %d %d %d %d %s\n")                         \
-         % sendTimeStamp                                                                     \
-         % hopNumber                                                                         \
-         % responseSize                                                                      \
-         % (unsigned int)(status & 0xff)                                                     \
-                                                                                             \
-         % timeSource                                                                        \
-         % delayAppSend                                                                      \
-         % delayQueuing                                                                      \
-         % delayAppReceive                                                                   \
-         % rttApplication                                                                    \
-         % rttSoftware                                                                       \
-         % rttHardware                                                                       \
-                                                                                             \
-         % hopIP.to_string()                                                                 \
-      );                                                                                     \
-   lines++;
+#define OUTPUT_TRACEROUTE_HOP_V2()                         \
+   if(!dedupInProgress) {                                  \
+      outputStream <<  str(boost::format                   \
+         ("\t%x %d %d %d %08x %d %d %d %d %d %d %s\n")     \
+            % sendTimeStamp                                \
+            % hopNumber                                    \
+            % responseSize                                 \
+            % (unsigned int)(status & 0xff)                \
+                                                           \
+            % timeSource                                   \
+            % delayAppSend                                 \
+            % delayQueuing                                 \
+            % delayAppReceive                              \
+            % rttApplication                               \
+            % rttSoftware                                  \
+            % rttHardware                                  \
+                                                           \
+            % hopIP.to_string()                            \
+         );                                                \
+      lines++;                                             \
+   }
 
 
 #if 0
 // ###### Jitter ############################################################
-#define OUTPUT_JITTER_V2                                                                     \
-   if(__builtin_expect(lines == 0, 0)) {                                                     \
-      outputStream << "#? HPCT Jitter 2 " << ProgramID << "\n";                              \
-   }                                                                                         \
-   outputStream <<                                                                           \
-      str(boost::format("#J%c %d %s %s %x %d %x %d %x %d %d %d %08x %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n") \
-         % protocol                                                                          \
-         % measurementID                                                                     \
-         % sourceIP.to_string()                                                              \
-         % destinationIP.to_string()                                                         \
-         % timeStamp                                                                         \
-         % roundNumber                                                                       \
-         % (unsigned int)trafficClass                                                        \
-         % packetSize                                                                        \
-         % checksum                                                                          \
-         % sourcePort                                                                        \
-         % destinationPort                                                                   \
-         % status                                                                            \
-         % timeSource                                                                        \
-         % jitterType                                                                        \
-                                                                                             \
-         % appSendPackets                                                                    \
-         % appSendMeanLatency                                                                \
-         % appSendJitter                                                                     \
-                                                                                             \
-         % queuingPackets                                                                    \
-         % queuingMeanLatency                                                                \
-         % queuingJitter                                                                     \
-                                                                                             \
-         % appReceivePackets                                                                 \
-         % appReceiveMeanLatency                                                             \
-         % appReceiveJitter                                                                  \
-                                                                                             \
-         % applicationPackets                                                                \
-         % applicationMeanRTT                                                                \
-         % applicationJitter                                                                 \
-                                                                                             \
-         % softwarePackets                                                                   \
-         % softwareMeanRTT                                                                   \
-         % softwareJitter                                                                    \
-                                                                                             \
-         % hardwarePackets                                                                   \
-         % hardwareMeanRTT                                                                   \
-         % hardwareJitter                                                                    \
-      );                                                                                     \
-   lines++;                                                                                  \
-   lastTimeStamp = timeStamp;
+#define OUTPUT_JITTER_V2(timeStampVariable) {              \
+   const std::string outputString = str(boost::format      \
+      ("#J%c %d %s %s %x %d %x %d %x %d %d %d %08x %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n") \
+         % protocol                                        \
+         % measurementID                                   \
+         % sourceIP.to_string()                            \
+         % destinationIP.to_string()                       \
+         % timeStamp                                       \
+         % roundNumber                                     \
+         % (unsigned int)trafficClass                      \
+         % packetSize                                      \
+         % checksum                                        \
+         % sourcePort                                      \
+         % destinationPort                                 \
+         % status                                          \
+         % timeSource                                      \
+         % jitterType                                      \
+                                                           \
+         % appSendPackets                                  \
+         % appSendMeanLatency                              \
+         % appSendJitter                                   \
+                                                           \
+         % queuingPackets                                  \
+         % queuingMeanLatency                              \
+         % queuingJitter                                   \
+                                                           \
+         % appReceivePackets                               \
+         % appReceiveMeanLatency                           \
+         % appReceiveJitter                                \
+                                                           \
+         % applicationPackets                              \
+         % applicationMeanRTT                              \
+         % applicationJitter                               \
+                                                           \
+         % softwarePackets                                 \
+         % softwareMeanRTT                                 \
+         % softwareJitter                                  \
+                                                           \
+         % hardwarePackets                                 \
+         % hardwareMeanRTT                                 \
+         % hardwareJitter                                  \
+      );                                                   \
+   OUTPUT_ITEM("Jitter 2", timeStampVariable);             \
+}
 #endif
 
 
@@ -326,6 +344,7 @@ int main(int argc, char** argv)
    unsigned long long                               toTimeStamp   = 0;
    unsigned int                                     fromMeasurementID;
    unsigned int                                     toMeasurementID;
+   bool                                             deduplication = false;
 
    boost::program_options::options_description commandLineOptions;
    commandLineOptions.add_options()
@@ -361,6 +380,9 @@ int main(int argc, char** argv)
       ( "address-to-measurementid,M",
            boost::program_options::value<std::filesystem::path>(&addressToMeasurementIDFile)->default_value(std::filesystem::path()),
            "Address to Measurement ID mapping file" )
+      ( "deduplication",
+           boost::program_options::value<bool>(&deduplication)->default_value(false),
+           "Deduplication of output items (only needed for debugging/special cases)" )
 
       ( "from-time",
            boost::program_options::value<std::string>(&fromTimeString)->default_value(std::string()),
@@ -393,8 +415,7 @@ int main(int argc, char** argv)
    try {
       boost::program_options::store(boost::program_options::command_line_parser(argc, argv).
                                        style(
-                                          boost::program_options::command_line_style::style_t::default_style|
-                                          boost::program_options::command_line_style::style_t::allow_long_disguise
+                                          boost::program_options::command_line_style::style_t::unix_style
                                        ).
                                        options(allOptions).positional(positionalParameters).
                                        run(), vm);
@@ -406,7 +427,7 @@ int main(int argc, char** argv)
    }
 
    if(vm.count("help")) {
-       std::cerr << "Usage: " << argv[0] << " parameters" << "\n"
+       std::cerr << "Usage: " << argv[0] << " database_configuration ping|traceroute OPTIONS" << "\n"
                  << commandLineOptions;
        return 1;
    }
@@ -440,16 +461,18 @@ int main(int argc, char** argv)
       std::cerr << "ERROR: to measurement identifier < from measurement identifier!\n";
       return 1;
    }
-   if(addressToMeasurementIDFile != std::filesystem::path()) {
+   if(!addressToMeasurementIDFile.empty()) {
       std::ifstream mappingFile(addressToMeasurementIDFile);
       if(!mappingFile.good()) {
          std::cerr << "ERROR: Unable to read mapping file " << addressToMeasurementIDFile << "!\n";
          return 1;
       }
+      unsigned long long line = 0;
       try {
          std::string  addressString;
          unsigned int measurementID;
          while(!mappingFile.eof()) {
+            line++;
             mappingFile >> addressString >> measurementID;
             addressToMeasurementID.insert(std::pair<boost::asio::ip::address, unsigned int>(
                                              boost::asio::ip::make_address(addressString),
@@ -458,7 +481,7 @@ int main(int argc, char** argv)
       }
       catch(const std::exception& e) {
          std::cerr << "ERROR: Parsing mapping file " << addressToMeasurementIDFile
-                   << " failed: " << e.what() << "!\n";
+                   << " failed in line " << line << ": " << e.what() << "!\n";
          return 1;
       }
    }
@@ -466,7 +489,7 @@ int main(int argc, char** argv)
 
    // ====== Initialise importer ============================================
    initialiseLogger(logLevel, logColor,
-                    (logFile != std::filesystem::path()) ? logFile.string().c_str() : nullptr);
+                    (!logFile.empty()) ? logFile.string().c_str() : nullptr);
 
    // ====== Read database configuration ====================================
    DatabaseConfiguration databaseConfiguration;
@@ -487,7 +510,7 @@ int main(int argc, char** argv)
    std::ofstream                       outputFile;
    boost::iostreams::filtering_ostream outputStream;
    const std::filesystem::path         tmpOutputFileName(outputFileName.string() + ".tmp");
-   if(outputFileName != std::filesystem::path()) {
+   if(!outputFileName.empty()) {
       std::error_code ec;
       std::filesystem::remove(outputFileName, ec);
       outputFile.open(tmpOutputFileName, std::ios_base::out | std::ios_base::binary);
@@ -520,6 +543,9 @@ int main(int argc, char** argv)
    Statement&                                  statement     = databaseClient->getStatement(queryType, false, true);
    const std::chrono::system_clock::time_point t1            = std::chrono::system_clock::now();
    unsigned long long                          lastTimeStamp = 0;
+   std::string                                 dedupLastItem;
+   bool                                        dedupInProgress;
+   unsigned long long                          dedupDuplicatesRemoved = 0;
    try {
       // ====== Ping ========================================================
       unsigned long long lines = 0;
@@ -529,10 +555,10 @@ int main(int argc, char** argv)
             if(tableVersion == 1) {
                std::string ts;
                if( (backend & DatabaseBackendType::SQL_PostgreSQL) == DatabaseBackendType::SQL_PostgreSQL ) {
-                  ts = "(1000000000 * CAST(EXTRACT(EPOCH FROM TimeStamp) AS BIGINT))";
+                  ts = "CAST((1000000000.0 * EXTRACT(EPOCH FROM TimeStamp)) AS BIGINT)";
                }
                else {
-                  ts = "(1000000000 * CAST(UNIX_TIMESTAMP(TimeStamp) AS UNSIGNED))";
+                  ts = "UNIX_TIMESTAMP(CONVERT_TZ(TimeStamp, '+00:00', @@global.time_zone)) * 1000000000";
                }
                statement
                   << "SELECT"
@@ -553,7 +579,7 @@ int main(int argc, char** argv)
                      " -1           AS Delay_AppSend,"
                      " -1           AS Delay_Queuing,"
                      " -1           AS Delay_AppReceive,"
-                     " 1000 * CAST(RTT AS BIGINT) AS RTT_App,"
+                     " 1000 * RTT   AS RTT_App,"
                      " -1           AS RTT_SW,"
                      " -1           AS RTT_HW "
                      "FROM " << ((tableName.size() == 0) ? "Ping" : tableName);
@@ -593,7 +619,7 @@ int main(int argc, char** argv)
                   const long long                rttApplication  = databaseClient->getBigInt(18);
                   const long long                rttSoftware     = databaseClient->getBigInt(19);
                   const long long                rttHardware     = databaseClient->getBigInt(20);
-                  OUTPUT_PING_V2;
+                  OUTPUT_PING_V2(sendTimeStamp);
                }
             }
             catch(const std::exception& e) {
@@ -602,9 +628,20 @@ int main(int argc, char** argv)
             }
          }
          else if(backend & DatabaseBackendType::NoSQL_Generic) {
-            statement << "{ \"" <<  ((tableName.size() == 0 ? "ping" : tableName)) << "\": { ";
-            addNoSQLFilter(statement, "sendTimestamp", fromTimeStamp, toTimeStamp, fromMeasurementID, toMeasurementID);
-            statement << " } }";
+            // ====== Old version 1 table ===================================
+            if(tableVersion == 1) {
+               statement << "[ { \"" <<  ((tableName.size() == 0 ? "ping" : tableName)) << "\": { ";
+               addNoSQLFilter(statement, "timestamp", fromTimeStamp / 1000ULL, toTimeStamp / 1000ULL,
+                              fromMeasurementID, toMeasurementID);
+               statement << " } }, { \"sort\": { \"timestamp\": 1, \"source\": 1, \"destination\": 1, \"tc\": 1 } } ]";
+            }
+            // ====== Current version 2 table ===============================
+            else {
+               statement << "[ { \"" <<  ((tableName.size() == 0 ? "ping" : tableName)) << "\": { ";
+               addNoSQLFilter(statement, "sendTimestamp", fromTimeStamp, toTimeStamp,
+                              fromMeasurementID, toMeasurementID);
+               statement << " } }, { \"sort\": { \"sendTimestamp\": 1, \"measurementID\": 1, \"sourceIP\": 1, \"destinationIP\": 1, \"protocol\": 1, \"trafficClass\": 1, \"burstSeq\": 1 } } ]";
+            }
 
             HPCT_LOG(debug) << "Query: " << statement;
             databaseClient->executeQuery(statement);
@@ -631,10 +668,10 @@ int main(int argc, char** argv)
                      const long long                delayAppSend    = -1;
                      const long long                delayQueuing    = -1;
                      const long long                delayAppReceive = -1;
-                     const long long                rttApplication  = databaseClient->getBigInt("rtt");
+                     const long long                rttApplication  = 1000 * databaseClient->getBigInt("rtt");
                      const long long                rttSoftware     = 0;
                      const long long                rttHardware     = 0;
-                     OUTPUT_PING_V2;
+                     OUTPUT_PING_V2(sendTimeStamp);
                   }
                }
                // ====== Current version 2 table ============================
@@ -661,7 +698,7 @@ int main(int argc, char** argv)
                      const long long                rttApplication  = databaseClient->getBigInt("rtt.app");
                      const long long                rttSoftware     = databaseClient->getBigInt("rtt.sw");
                      const long long                rttHardware     = databaseClient->getBigInt("rtt.hw");
-                     OUTPUT_PING_V2;
+                     OUTPUT_PING_V2(sendTimeStamp);
                   }
                }
             }
@@ -683,10 +720,10 @@ int main(int argc, char** argv)
             if(tableVersion == 1) {
                std::string ts;
                if( (backend & DatabaseBackendType::SQL_PostgreSQL) == DatabaseBackendType::SQL_PostgreSQL ) {
-                  ts = "(1000000000 * CAST(EXTRACT(EPOCH FROM TimeStamp) AS BIGINT))";
+                  ts = "CAST((1000000000.0 * EXTRACT(EPOCH FROM TimeStamp)) AS BIGINT)";
                }
                else {
-                  ts = "(1000000000 * CAST(UNIX_TIMESTAMP(TimeStamp) AS UNSIGNED))";
+                  ts = "UNIX_TIMESTAMP(CONVERT_TZ(TimeStamp, '+00:00', @@global.time_zone)) * 1000000000";
                }
                statement
                   << "SELECT"
@@ -712,7 +749,7 @@ int main(int argc, char** argv)
                      " -1           AS Delay_AppSend,"
                      " -1           AS Delay_Queuing,"
                      " -1           AS Delay_AppReceive,"
-                     " 1000 * CAST(RTT AS BIGINT) AS RTT_App,"
+                     " 1000 * RTT   AS RTT_App,"
                      " -1           AS RTT_SW,"
                      " -1           AS RTT_HW "
                      "FROM " << ((tableName.size() == 0) ? "Traceroute" : tableName);
@@ -760,9 +797,9 @@ int main(int argc, char** argv)
 
                   if(hopNumber == 1) {
                      const unsigned int statusFlags = status - (status & 0xff);
-                     OUTPUT_TRACEROUTE_HEADER_V2;
+                     OUTPUT_TRACEROUTE_HEADER_V2(timeStamp);
                   }
-                  OUTPUT_TRACEROUTE_HOP_V2;
+                  OUTPUT_TRACEROUTE_HOP_V2();
                }
             }
             catch(const std::exception& e) {
@@ -771,9 +808,20 @@ int main(int argc, char** argv)
             }
          }
          else if(backend & DatabaseBackendType::NoSQL_Generic) {
-            statement << "{ \"" <<  ((tableName.size() == 0 ? "traceroute" : tableName)) << "\": { ";
-            addNoSQLFilter(statement, "timestamp", fromTimeStamp, toTimeStamp, fromMeasurementID, toMeasurementID);
-            statement << " } }";
+            // ====== Old version 1 table ===================================
+            if(tableVersion == 1) {
+               statement << "[ { \"" <<  ((tableName.size() == 0 ? "traceroute" : tableName)) << "\": { ";
+               addNoSQLFilter(statement, "timestamp", fromTimeStamp/ 1000ULL, toTimeStamp/ 1000ULL,
+                              fromMeasurementID, toMeasurementID);
+               statement << " } }, { \"sort\": { \"timestamp\": 1, \"source\": 1, \"destination\": 1, \"tc\": 1, \"round\": 1 } } ]";
+            }
+            // ====== Current version 2 table ===============================
+            else {
+               statement << "[ { \"" <<  ((tableName.size() == 0 ? "traceroute" : tableName)) << "\": { ";
+               addNoSQLFilter(statement, "timestamp", fromTimeStamp, toTimeStamp,
+                              fromMeasurementID, toMeasurementID);
+               statement << " } }, { \"sort\": { \"timestamp\": 1, \"measurementID\": 1, \"sourceIP\": 1, \"destinationIP\": 1, \"protocol\": 1, \"trafficClass\": 1, \"roundNumber\": 1 } } ]";
+            }
 
             HPCT_LOG(debug) << "Query: " << statement;
             databaseClient->executeQuery(statement);
@@ -797,7 +845,7 @@ int main(int argc, char** argv)
                      const uint16_t                 destinationPort = 0;
                      const unsigned int             statusFlags     = databaseClient->getInteger("statusFlags");
                      const long long                pathHash        = databaseClient->getBigInt("pathHash");
-                     OUTPUT_TRACEROUTE_HEADER_V2;
+                     OUTPUT_TRACEROUTE_HEADER_V2(timeStamp);
 
                      databaseClient->getArrayBegin("hops");
                      unsigned int hopNumber = 0;
@@ -809,13 +857,13 @@ int main(int argc, char** argv)
                         const boost::asio::ip::address hopIP           = statement.decodeAddress(databaseClient->getString("hop"));
                         const unsigned int             status          = databaseClient->getInteger("status");
                         const unsigned int             timeSource      = 0x00000000;
-                        const long long                delayAppSend    = 0;
-                        const long long                delayQueuing    = 0;
-                        const long long                delayAppReceive = 0;
-                        const long long                rttApplication  = databaseClient->getBigInt("rtt");
+                        const long long                delayAppSend    = -1;
+                        const long long                delayQueuing    = -1;
+                        const long long                delayAppReceive = -1;
+                        const long long                rttApplication  = 1000 * databaseClient->getBigInt("rtt");
                         const long long                rttSoftware     = -1;
                         const long long                rttHardware     = -1;
-                        OUTPUT_TRACEROUTE_HOP_V2;
+                        OUTPUT_TRACEROUTE_HOP_V2();
                      }
                      databaseClient->getArrayEnd();
                   }
@@ -839,7 +887,7 @@ int main(int argc, char** argv)
                      const uint16_t                 destinationPort = databaseClient->getInteger("destinationPort");
                      const unsigned int             statusFlags     = databaseClient->getInteger("statusFlags");
                      const long long                pathHash        = databaseClient->getBigInt("pathHash");
-                     OUTPUT_TRACEROUTE_HEADER_V2;
+                     OUTPUT_TRACEROUTE_HEADER_V2(timeStamp);
 
                      databaseClient->getArrayBegin("hops");
                      unsigned int hopNumber = 0;
@@ -857,7 +905,7 @@ int main(int argc, char** argv)
                         const long long                rttApplication  = databaseClient->getBigInt("rtt.app");
                         const long long                rttSoftware     = databaseClient->getBigInt("rtt.sw");
                         const long long                rttHardware     = databaseClient->getBigInt("rtt.hw");
-                        OUTPUT_TRACEROUTE_HOP_V2;
+                        OUTPUT_TRACEROUTE_HOP_V2();
                      }
                      databaseClient->getArrayEnd();
                   }
@@ -927,13 +975,13 @@ int main(int argc, char** argv)
                const unsigned long long       hardwareMeanRTT       = databaseClient->getBigInt(31);
                const unsigned long long       hardwareJitter        = databaseClient->getBigInt(32);
 
-               OUTPUT_JITTER_V2;
+               OUTPUT_JITTER_V2(timeStamp);
             }
          }
          else if(backend & DatabaseBackendType::NoSQL_Generic) {
-            statement << "{ \"" <<  ((tableName.size() == 0 ? "jitter" : tableName)) << "\": { ";
+            statement << "[ { \"" <<  ((tableName.size() == 0 ? "jitter" : tableName)) << "\": { ";
             addNoSQLFilter(statement, "timestamp", fromTimeStamp, toTimeStamp, fromMeasurementID, toMeasurementID);
-            statement << " } }";
+            statement << " } }, { \"sort\": { \"timestamp\": 1, \"measurementID\": 1, \"sourceIP\": 1, \"destinationIP\": 1, \"protocol\": 1, \"trafficClass\": 1, \"roundNumber\": 1 } } ]";
 
             HPCT_LOG(debug) << "Query: " << statement;
             databaseClient->executeQuery(statement);
@@ -943,7 +991,7 @@ int main(int argc, char** argv)
                   const unsigned long long       timeStamp             = databaseClient->getBigInt("timestamp");
                   const boost::asio::ip::address sourceIP              = statement.decodeAddress(databaseClient->getString("sourceIP"));
                   const boost::asio::ip::address destinationIP         = statement.decodeAddress(databaseClient->getString("destinationIP"));
-                  const unsigned long long       measurementID         = mapMeasurementID(databaseClient->getInteger("measurementID")
+                  const unsigned long long       measurementID         = mapMeasurementID(databaseClient->getInteger("measurementID"),
                                                                                           addressToMeasurementID, sourceIP);
                   const char                     protocol              = databaseClient->getInteger("protocol");
                   const uint8_t                  trafficClass          = databaseClient->getInteger("trafficClass");
@@ -980,7 +1028,7 @@ int main(int argc, char** argv)
                   const unsigned long long       hardwareMeanRTT       = databaseClient->getBigInt("hardwareMeanRTT");
                   const unsigned long long       hardwareJitter        = databaseClient->getBigInt("hardwareJitter");
 
-                  OUTPUT_JITTER_V2;
+                  OUTPUT_JITTER_V2(timeStamp);
                }
             }
             catch(const std::exception& e) {
@@ -1006,22 +1054,27 @@ int main(int argc, char** argv)
       const std::chrono::system_clock::time_point t2 = std::chrono::system_clock::now();
       HPCT_LOG(info) << "Wrote " << lines << " results lines in "
                      << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count() << " ms";
+      if( (deduplication) && (dedupDuplicatesRemoved > 0) ) {
+         HPCT_LOG(warning) << "Found and removed " << dedupDuplicatesRemoved << " duplicates from output!";
+      }
    }
    catch(const std::exception& e) {
       HPCT_LOG(fatal) << "Query failed: " << e.what();
       exit(1);
    }
 
-   try {
-      std::filesystem::rename(tmpOutputFileName, outputFileName);
+   if(!outputFileName.empty()) {
+      try {
+         std::filesystem::rename(tmpOutputFileName, outputFileName);
 
-      // Set timestamp to the latest timestamp in the data. Note: the timestamp is UTC!
-      const std::time_t t = (std::time_t)(lastTimeStamp / 1000000000);
-      boost::filesystem::last_write_time(boost::filesystem::path(outputFileName), t);
-   }
-   catch(const std::exception& e) {
-      HPCT_LOG(fatal) << "Writing results failed: " << e.what();
-      exit(1);
+         // Set timestamp to the latest timestamp in the data. Note: the timestamp is UTC!
+         const std::time_t t = (std::time_t)(lastTimeStamp / 1000000000);
+         boost::filesystem::last_write_time(boost::filesystem::path(outputFileName), t);
+      }
+      catch(const std::exception& e) {
+         HPCT_LOG(fatal) << "Writing results failed: " << e.what();
+         exit(1);
+      }
    }
 
    // ====== Clean up =======================================================

@@ -28,9 +28,21 @@
 -- Contact: dreibh@simula.no
 
 
+# ###### Basic database features test #######################################
 SELECT COUNT(*) FROM Ping;
 SELECT * FROM Ping LIMIT 10;
 SELECT COUNT(*) FROM Traceroute;
 SELECT * FROM Traceroute LIMIT 30;
 SELECT COUNT(*) FROM Jitter;
 SELECT * FROM Jitter LIMIT 5;
+
+
+# ###### Test helper functions ##############################################
+SELECT UTCDateTime2UnixTimestamp('2014-09-29 11:22:33.789123');
+SELECT UnixTimestamp2UTCDateTime(1411989753789123000);
+
+SELECT UnixTimestamp2UTCDateTime(SendTimestamp), SendTimestamp FROM Ping ORDER BY SendTimestamp LIMIT 10;
+SELECT TimeStamp FROM Ping_v1 ORDER BY TimeStamp LIMIT 10;
+
+SELECT UnixTimestamp2UTCDateTime(Timestamp), Timestamp FROM Traceroute ORDER BY Timestamp LIMIT 10;
+SELECT TimeStamp FROM Traceroute_v1 ORDER BY Timestamp LIMIT 10;

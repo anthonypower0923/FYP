@@ -35,13 +35,11 @@
 #include <boost/program_options.hpp>
 
 #include "check.h"
-#include "icmpheader.h"
 // #include "jitter.h"
 #include "logger.h"
 #include "package-version.h"
 #include "ping.h"
 #include "resultswriter.h"
-#include "service.h"
 #include "tools.h"
 #include "traceroute.h"
 
@@ -51,10 +49,10 @@ static std::map<boost::asio::ip::address, std::set<uint8_t>> SourceArray;
 static std::set<boost::asio::ip::address>                    DestinationArray;
 static std::set<ResultsWriter*>                              ResultsWriterSet;
 static std::set<Service*>                                    ServiceSet;
-static boost::asio::io_service                               IOService;
-static boost::asio::signal_set                               Signals(IOService, SIGINT, SIGTERM);
+static boost::asio::io_context                               IOContext;
+static boost::asio::signal_set                               Signals(IOContext, SIGINT, SIGTERM);
 static boost::posix_time::milliseconds                       CleanupTimerInterval(1000);
-static boost::asio::deadline_timer                           CleanupTimer(IOService, CleanupTimerInterval);
+static boost::asio::deadline_timer                           CleanupTimer(IOContext, CleanupTimerInterval);
 
 
 // ###### Signal handler ####################################################
@@ -396,8 +394,7 @@ int main(int argc, char** argv)
    try {
       boost::program_options::store(boost::program_options::command_line_parser(argc, argv).
                                        style(
-                                          boost::program_options::command_line_style::style_t::default_style|
-                                          boost::program_options::command_line_style::style_t::allow_long_disguise
+                                          boost::program_options::command_line_style::style_t::unix_style
                                        ).
                                        options(commandLineOptions).
                                        run(), vm);
@@ -409,7 +406,7 @@ int main(int argc, char** argv)
    }
 
    if(vm.count("help")) {
-       std::cerr << "Usage: " << argv[0] << " parameters" << "\n"
+       std::cerr << "Usage: " << argv[0] << " OPTIONS" << "\n"
                  << commandLineOptions;
        return 1;
    }
@@ -514,7 +511,7 @@ int main(int argc, char** argv)
 
    // ====== Initialize =====================================================
    initialiseLogger(logLevel, logColor,
-                    (logFile != std::filesystem::path()) ? logFile.string().c_str() : nullptr);
+                    (!logFile.empty()) ? logFile.string().c_str() : nullptr);
    const passwd* pw = getUser(user.c_str());
    if(pw == nullptr) {
       HPCT_LOG(fatal) << "Cannot find user \"" << user << "\"!";
@@ -577,7 +574,7 @@ int main(int argc, char** argv)
    if(serviceJitter) {
       HPCT_LOG(info) << "Jitter Service:" << std:: endl
                      << "* Interval           = " << jitterParameters.Interval            << " ms ± "
-                     << 100.0 * jitterParameters.Deviation << "%\n"
+                        << 100.0 * jitterParameters.Deviation << "%\n"
                      << "* Expiration         = " << jitterParameters.Expiration << " ms" << "\n"
                      << "* Burst              = " << jitterParameters.Rounds              << "\n"
                      << "* TTL                = " << jitterParameters.InitialMaxTTL       << "\n"
@@ -589,7 +586,7 @@ int main(int argc, char** argv)
    if(servicePing) {
       HPCT_LOG(info) << "Ping Service:" << std:: endl
                      << "* Interval           = " << pingParameters.Interval              << " ms ± "
-                     << 100.0 * pingParameters.Deviation << "%\n"
+                        << 100.0 * pingParameters.Deviation << "%\n"
                      << "* Expiration         = " << pingParameters.Expiration            << " ms" << "\n"
                      << "* Burst              = " << pingParameters.Rounds                << "\n"
                      << "* TTL                = " << pingParameters.InitialMaxTTL         << "\n"
@@ -600,7 +597,7 @@ int main(int argc, char** argv)
    if(serviceTraceroute) {
       HPCT_LOG(info) << "Traceroute Service:" << std:: endl
                      << "* Interval           = " << tracerouteParameters.Interval        << " ms ± "
-                     << 100.0 * tracerouteParameters.Deviation << "%\n"
+                        << 100.0 * tracerouteParameters.Deviation << "%\n"
                      << "* Expiration         = " << tracerouteParameters.Expiration      << " ms" << "\n"
                      << "* Rounds             = " << tracerouteParameters.Rounds          << "\n"
                      << "* Initial MaxTTL     = " << tracerouteParameters.InitialMaxTTL   << "\n"
@@ -774,7 +771,7 @@ int main(int argc, char** argv)
    // ====== Wait for termination signal ====================================
    Signals.async_wait(signalHandler);
    CleanupTimer.async_wait(tryCleanup);
-   IOService.run();
+   IOContext.run();
 
 
    // ====== Shut down service threads ======================================

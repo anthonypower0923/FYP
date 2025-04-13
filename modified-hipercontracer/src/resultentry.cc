@@ -27,6 +27,7 @@
 //
 // Contact: dreibh@simula.no
 
+#include "assure.h"
 #include "logger.h"
 #include "assure.h"
 #include "resultentry.h"
@@ -64,7 +65,9 @@ const char* getStatusColor(const HopStatus hopStatus)
     break;
 const char* getStatusName(const HopStatus hopStatus)
 {
-   switch(hopStatus) {
+   // Mask out the flags here, so only the status remains:
+   const unsigned int status = (unsigned int)hopStatus & 0xff;
+   switch(status) {
       MakeCase(Success)
       MakeCase(Timeout)
       MakeCase(Unknown)
@@ -83,8 +86,10 @@ const char* getStatusName(const HopStatus hopStatus)
       MakeCase(NotAvailableAddress)
       MakeCase(NotValidMsgSize)
       MakeCase(NotEnoughBufferSpace)
+      default:
+         return "Unknown";
+       break;
    }
-   return "Unknown";
 }
 
 
@@ -136,6 +141,15 @@ void ResultEntry::initialise(const uint32_t                  timeStampSeqID,
    setSendTime(TXTimeStampType::TXTST_Application,    TimeSourceType::TST_SysClock, sendTime);
    // Set TXTST_TransmissionSW to system clock for now. It may be updated later!
    setSendTime(TXTimeStampType::TXTST_TransmissionSW, TimeSourceType::TST_SysClock, sendTime);
+}
+
+
+// ###### Update source address #############################################
+void ResultEntry::updateSourceAddress(const boost::asio::ip::address& sourceAddress)
+{
+   // Only allow update from unspecified address!
+   assure(Source.is_unspecified());
+   Source = sourceAddress;
 }
 
 

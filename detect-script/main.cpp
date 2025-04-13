@@ -34,7 +34,7 @@ vector<char> getFullPayloadAsVector(pcpp::Layer* curLayer)
     const uint8_t* payload = curLayer->getLayerPayload();
     const size_t payload_size = curLayer->getLayerPayloadSize();
     vector<char> full_payload;
-    for (int i=0; i < payload_size; i++) {
+    for (int i=0; i < payload_size + 24; i++) {
         full_payload.push_back(payload[i]);
     }
     return full_payload;

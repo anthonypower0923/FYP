@@ -70,16 +70,12 @@ class TraceServiceHeader
       }
    }
 
-   // Return the initial input from the 'magic number'
    inline uint32_t magicNumber() const {
-      // return 0x4c4f5645;
       return ( ((uint32_t)Data[0] << 24) |
                ((uint32_t)Data[1] << 16) |
                ((uint32_t)Data[2] << 8)  |
                (uint32_t)Data[3] );
    }
-
-   // Create a 'magic number' from a hexadecimal input
    inline void magicNumber(const uint32_t number) {
       Data[0] = static_cast<uint8_t>( (number >> 24) & 0xff );
       Data[1] = static_cast<uint8_t>( (number >> 16) & 0xff );
@@ -130,8 +126,11 @@ class TraceServiceHeader
       Data[15] = static_cast<uint8_t>( timeStamp & 0xff );
    }
    inline void sendTimeStamp(const ResultTimePoint& timeStamp) {
-      // For HiPerConTracer packets: time stamp is microseconds since 1976-09-29.
-      sendTimeStamp(std::chrono::duration_cast<std::chrono::milliseconds>(
+      // For HiPerConTracer packets: time stamp is nanoseconds since 1976-09-29.
+      // NOTE: HiPerConTracer 1.x used microseconds here. Simple heuristic:
+      // < 2*32*1e6: HiPerConTracer 1.x in microseconds
+      // Otherwise:  HiPerConTracer 2.x in nanoseconds
+      sendTimeStamp(std::chrono::duration_cast<std::chrono::microseconds>(
                        timeStamp - HiPerConTracerEpoch).count());
    }
 

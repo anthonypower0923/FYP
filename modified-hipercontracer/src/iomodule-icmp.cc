@@ -48,18 +48,18 @@
 
 
 // ###### Constructor #######################################################
-ICMPModule::ICMPModule(boost::asio::io_service&                 ioService,
+ICMPModule::ICMPModule(boost::asio::io_context&                 ioContext,
                        std::map<unsigned short, ResultEntry*>&  resultsMap,
                        const boost::asio::ip::address&          sourceAddress,
                        const uint16_t                           sourcePort,
                        const uint16_t                           destinationPort,
                        std::function<void (const ResultEntry*)> newResultCallback,
                        const unsigned int                       packetSize)
-   : IOModuleBase(ioService, resultsMap, sourceAddress, sourcePort, destinationPort,
+   : IOModuleBase(ioContext, resultsMap, sourceAddress, sourcePort, destinationPort,
                   newResultCallback),
-     ICMPSocket(IOService, (sourceAddress.is_v6() == true) ? boost::asio::ip::icmp::v6() :
+     ICMPSocket(IOContext, (sourceAddress.is_v6() == true) ? boost::asio::ip::icmp::v6() :
                                                              boost::asio::ip::icmp::v4() ),
-     UDPSocket(IOService, (sourceAddress.is_v6() == true) ? boost::asio::ip::udp::v6() :
+     UDPSocket(IOContext, (sourceAddress.is_v6() == true) ? boost::asio::ip::udp::v6() :
                                                             boost::asio::ip::udp::v4() )
 {
    // Overhead: IPv4 Header (20)/IPv6 Header (40) + ICMP Header (8)
@@ -129,9 +129,9 @@ bool ICMPModule::prepareSocket()
                     &filter, sizeof(struct icmp6_filter)) < 0) {
          HPCT_LOG(warning) << "Unable to set ICMP6_FILTER!";
       }
-  }
+   }
 #if defined (ICMP_FILTER)
-  else {
+   else {
       icmp_filter filter;
       filter.data = ~( (1 << ICMP_ECHOREPLY)      |
                        (1 << ICMP_TIME_EXCEEDED)  |
@@ -142,7 +142,9 @@ bool ICMPModule::prepareSocket()
       }
   }
 #else
+#if !defined(__FreeBSD__)
 #warning No ICMP_FILTER!
+#endif
 #endif
 
    // ====== Await incoming message or error ================================
@@ -196,11 +198,11 @@ unsigned int ICMPModule::sendRequest(const DestinationInfo& destination,
                                      uint16_t&              seqNumber,
                                      uint32_t*              targetChecksumArray)
 {
+   const boost::asio::ip::icmp::endpoint remoteEndpoint(destination.address(), 0);
    const boost::asio::ip::icmp::endpoint localEndpoint(SourceAddress.is_unspecified() ?
                                                           findSourceForDestination(destination.address()) :
                                                           SourceAddress,
                                                        0);
-   const boost::asio::ip::icmp::endpoint remoteEndpoint(destination.address(), 0);
 
    // ====== Set TOS/Traffic Class ==========================================
    int level;
@@ -230,7 +232,7 @@ unsigned int ICMPModule::sendRequest(const DestinationInfo& destination,
    echoRequest.type((SourceAddress.is_v6() == true) ?
                        ICMP6_ECHO_REQUEST : ICMP_ECHO);
    echoRequest.code(0);
-   echoRequest.identifier(65535);
+   echoRequest.identifier(Identifier);
 
    // ====== Message scatter/gather array ===================================
    const std::array<boost::asio::const_buffer, 2> buffer {
@@ -257,7 +259,7 @@ unsigned int ICMPModule::sendRequest(const DestinationInfo& destination,
    for(unsigned int round = fromRound; round <= toRound; round++) {
       for(int ttl = (int)fromTTL; ttl >= (int)toTTL; ttl--) {
          assure(currentEntry < entries);
-         // seqNumber++;   // New sequence number!
+         seqNumber++;   // New sequence number!
 
          // ====== Set TTL ==================================================
          if(ttl != currentTTL) {
@@ -639,7 +641,7 @@ void ICMPModule::handlePayloadResponse(const int     socketDescriptor,
             TraceServiceHeader tsHeader;
             is >> tsHeader;
             if(is) {
-               if(0x4c4f5645 == MagicNumber) {
+               if(tsHeader.magicNumber() == MagicNumber) {
                   // This is ICMP payload checked by the kernel =>
                   // not setting receivedData.Source and receivedData.Destination here!
                   recordResult(receivedData,
@@ -660,7 +662,7 @@ void ICMPModule::handlePayloadResponse(const int     socketDescriptor,
             if( (is) &&
                 (innerIPv6Header.nextHeader() == IPPROTO_ICMPV6) &&
                 (innerICMPHeader.identifier() == Identifier) &&
-                (0x4c4f5645 == MagicNumber) ) {
+                (tsHeader.magicNumber() == MagicNumber) ) {
                receivedData.Source      = boost::asio::ip::udp::endpoint(innerIPv6Header.sourceAddress(), 0);
                receivedData.Destination = boost::asio::ip::udp::endpoint(innerIPv6Header.destinationAddress(), 0);
                recordResult(receivedData,
@@ -688,7 +690,7 @@ void ICMPModule::handlePayloadResponse(const int     socketDescriptor,
                // ------ TraceServiceHeader ---------------------------------
                TraceServiceHeader tsHeader;
                is >> tsHeader;
-               if( (is) && (0x4c4f5645 == MagicNumber) ) {
+               if( (is) && (tsHeader.magicNumber() == MagicNumber) ) {
                   // NOTE: This is the reponse
                   //       -> source and destination are swapped!
                   receivedData.Source      = boost::asio::ip::udp::endpoint(ipv4Header.destinationAddress(), 0);

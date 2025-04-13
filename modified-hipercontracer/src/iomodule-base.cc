@@ -31,9 +31,10 @@
 #include "assure.h"
 #include "tools.h"
 #include "logger.h"
-#include "icmpheader.h"
 
 #include <ifaddrs.h>
+#include <netinet/icmp6.h>
+#include <netinet/ip_icmp.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #ifdef __linux__
@@ -58,13 +59,13 @@ std::list<IOModuleBase::RegisteredIOModule*>* IOModuleBase::IOModuleList = nullp
 
 
 // ###### Constructor #######################################################
-IOModuleBase::IOModuleBase(boost::asio::io_service&                 ioService,
+IOModuleBase::IOModuleBase(boost::asio::io_context&                 ioContext,
                            std::map<unsigned short, ResultEntry*>&  resultsMap,
                            const boost::asio::ip::address&          sourceAddress,
                            const uint16_t                           sourcePort,
                            const uint16_t                           destinationPort,
                            std::function<void (const ResultEntry*)> newResultCallback)
-   : IOService(ioService),
+   : IOContext(ioContext),
      ResultsMap(resultsMap),
      SourceAddress(sourceAddress),
      SourcePort(sourcePort),
@@ -100,7 +101,9 @@ bool IOModuleBase::configureSocket(const int                      socketDescript
       return false;
    }
 #else
+#if !defined(__FreeBSD__)
 #warning No IP_RECVERR/IPV6_RECVERR!
+#endif
 #endif
 
    // ====== Try to use SO_TIMESTAMPING option ==============================
@@ -127,7 +130,9 @@ bool IOModuleBase::configureSocket(const int                      socketDescript
       HPCT_LOG(error) << "Unable to enable SO_TIMESTAMPING option on socket: "
                       << strerror(errno);
 #else
+#if !defined(__FreeBSD__)
 #warning No SO_TIMESTAMPING!
+#endif
 #endif
 
       // ====== Try to use SO_TIMESTAMPNS ===================================
@@ -136,7 +141,9 @@ bool IOModuleBase::configureSocket(const int                      socketDescript
                     &on, sizeof(on)) < 0) {
 
 #else
+#if !defined(__FreeBSD__)
 #warning No SO_TIMESTAMPNS!
+#endif
 #endif
 
          // ====== Try to use SO_TIMESTAMP ==================================
@@ -261,21 +268,22 @@ bool IOModuleBase::configureSocket(const int                      socketDescript
 }
 
 
-std::map<boost::asio::ip::address, boost::asio::ip::address> IOModuleBase::SourceForDestinationMap;
-std::mutex                                                   IOModuleBase::SourceForDestinationMapMutex;
+
+// ###### Get unspecified IPv4 or IPv6 address ##############################
+boost::asio::ip::address IOModuleBase::UnspecIPv4 = boost::asio::ip::address_v4();
+boost::asio::ip::address IOModuleBase::UnspecIPv6 = boost::asio::ip::address_v6();
+const boost::asio::ip::address& IOModuleBase::unspecifiedAddress(const bool ipv6)
+{
+   if(ipv6) {
+      return UnspecIPv6;
+   }
+   return UnspecIPv4;
+}
+
 
 // ###### Find source address for given destination address #################
 boost::asio::ip::address IOModuleBase::findSourceForDestination(const boost::asio::ip::address& destinationAddress)
 {
-   std::lock_guard<std::mutex> lock(SourceForDestinationMapMutex);
-
-   // ====== Cache lookup ===================================================
-   std::map<boost::asio::ip::address, boost::asio::ip::address>::const_iterator found =
-      SourceForDestinationMap.find(destinationAddress);
-   if(found != SourceForDestinationMap.end()) {
-      return found->second;
-   }
-
    // ====== Get source address from kernel =================================
    // Procedure:
    // - Create UDP socket
@@ -283,21 +291,16 @@ boost::asio::ip::address IOModuleBase::findSourceForDestination(const boost::asi
    // - Obtain local address
    // - Write this information into a cache for later lookup
    try {
-      boost::asio::io_service        ioService;
+      boost::asio::io_context        ioContext;
       boost::asio::ip::udp::endpoint destinationEndpoint(destinationAddress, 7);
-      boost::asio::ip::udp::socket   udpSpcket(ioService, (destinationAddress.is_v6() == true) ?
+      boost::asio::ip::udp::socket   udpSpcket(ioContext, (destinationAddress.is_v6() == true) ?
                                                              boost::asio::ip::udp::v6() :
                                                              boost::asio::ip::udp::v4());
       udpSpcket.connect(destinationEndpoint);
-      const boost::asio::ip::address sourceAddress = udpSpcket.local_endpoint().address();
-      SourceForDestinationMap.insert(std::pair<boost::asio::ip::address, boost::asio::ip::address>(destinationAddress,
-                                                                                                   sourceAddress));
-      return sourceAddress;
+      return udpSpcket.local_endpoint().address();
    }
    catch(...) {
-      return (destinationAddress.is_v6() == true) ?
-                (boost::asio::ip::address)boost::asio::ip::address_v6() :
-                (boost::asio::ip::address)boost::asio::ip::address_v4();
+      return unspecifiedAddress(destinationAddress.is_v6());
    }
 }
 
@@ -326,8 +329,13 @@ void IOModuleBase::recordResult(const ReceivedData&  receivedData,
       return;
    }
 
-   // ====== Get status =====================================================
+   // ====== Update source address from unspecified one =====================
+   if( (resultEntry->sourceAddress().is_unspecified()) &&
+       (!receivedData.Source.address().is_unspecified()) ) {
+      resultEntry->updateSourceAddress(receivedData.Source.address());
+   }
 
+   // ====== Get status =====================================================
    if(resultEntry->status() == Unknown) {
       resultEntry->setResponseSize(responseLength);
 
@@ -345,67 +353,78 @@ void IOModuleBase::recordResult(const ReceivedData&  receivedData,
                                   receivedData.ReceiveHWSource,
                                   receivedData.ReceiveHWTime);
 
-      // Set ICMP error status:
+      // ====== Obtain status code from response ============================
       HopStatus status = Unknown;
-      if(SourceAddress.is_v6()) {
-         if(icmpType == ICMP6_TIME_EXCEEDED) {
-            status = TimeExceeded;
+
+      // ------ Not ICMP/ICMPv6 ---------------------------------------------
+      if( (icmpType == 0) && (icmpCode == 0) ) {
+         // This is used for non-ICMP payload replies (success):
+         status = Success;
+      }
+
+      // ------ ICMP/ICMPv6 -------------------------------------------------
+      else {
+         // Set ICMP error status:
+         if(SourceAddress.is_v6()) {
+            if(icmpType == ICMP6_TIME_EXCEEDED) {
+               status = TimeExceeded;
+            }
+            else if(icmpType == ICMP6_DST_UNREACH) {
+               if(SourceAddress.is_v6()) {
+                  switch(icmpCode) {
+                     case ICMP6_DST_UNREACH_ADMIN:
+                        status = UnreachableProhibited;
+                     break;
+                     case ICMP6_DST_UNREACH_BEYONDSCOPE:
+                        status = UnreachableScope;
+                     break;
+                     case ICMP6_DST_UNREACH_NOROUTE:
+                        status = UnreachableNetwork;
+                     break;
+                     case ICMP6_DST_UNREACH_ADDR:
+                        status = UnreachableHost;
+                     break;
+                     case ICMP6_DST_UNREACH_NOPORT:
+                        status = UnreachablePort;
+                     break;
+                     default:
+                        status = UnreachableUnknown;
+                     break;
+                  }
+               }
+            }
+            else if(icmpType == ICMP6_ECHO_REPLY) {
+               status = Success;
+            }
          }
-         else if(icmpType == ICMP6_DST_UNREACH) {
-            if(SourceAddress.is_v6()) {
+         else {
+            if(icmpType == ICMP_TIMXCEED) {
+               status = TimeExceeded;
+            }
+            else if(icmpType == ICMP_UNREACH) {
                switch(icmpCode) {
-                  case ICMP6_DST_UNREACH_ADMIN:
+                  case ICMP_UNREACH_FILTER_PROHIB:
                      status = UnreachableProhibited;
-                   break;
-                  case ICMP6_DST_UNREACH_BEYONDSCOPE:
-                     status = UnreachableScope;
-                   break;
-                  case ICMP6_DST_UNREACH_NOROUTE:
+                  break;
+                  case ICMP_UNREACH_NET:
+                  case ICMP_UNREACH_NET_UNKNOWN:
                      status = UnreachableNetwork;
-                   break;
-                  case ICMP6_DST_UNREACH_ADDR:
+                  break;
+                  case ICMP_UNREACH_HOST:
+                  case ICMP_UNREACH_HOST_UNKNOWN:
                      status = UnreachableHost;
-                   break;
-                  case ICMP6_DST_UNREACH_NOPORT:
+                  break;
+                  case ICMP_UNREACH_PORT:
                      status = UnreachablePort;
-                   break;
+                  break;
                   default:
                      status = UnreachableUnknown;
                   break;
                }
             }
-         }
-         else if(icmpType == ICMP6_ECHO_REPLY) {
-            status = Success;
-         }
-      }
-      else {
-         if(icmpType == ICMP_TIMXCEED) {
-            status = TimeExceeded;
-         }
-         else if(icmpType == ICMP_UNREACH) {
-            switch(icmpCode) {
-               case ICMP_UNREACH_FILTER_PROHIB:
-                  status = UnreachableProhibited;
-                break;
-               case ICMP_UNREACH_NET:
-               case ICMP_UNREACH_NET_UNKNOWN:
-                  status = UnreachableNetwork;
-                break;
-               case ICMP_UNREACH_HOST:
-               case ICMP_UNREACH_HOST_UNKNOWN:
-                  status = UnreachableHost;
-                break;
-               case ICMP_UNREACH_PORT:
-                  status = UnreachablePort;
-                break;
-               default:
-                  status = UnreachableUnknown;
-                break;
+            else if(icmpType == ICMP_ECHOREPLY) {
+               status = Success;
             }
-         }
-         else if(icmpType == ICMP_ECHOREPLY) {
-            status = Success;
          }
       }
       resultEntry->setStatus(status);
@@ -420,7 +439,7 @@ bool IOModuleBase::registerIOModule(
    const ProtocolType  moduleType,
    const std::string&  moduleName,
    IOModuleBase*       (*createIOModuleFunction)(
-      boost::asio::io_service&                 ioService,
+      boost::asio::io_context&                 ioContext,
       std::map<unsigned short, ResultEntry*>&  resultsMap,
       const boost::asio::ip::address&          sourceAddress,
       const uint16_t                           sourcePort,
@@ -443,7 +462,7 @@ bool IOModuleBase::registerIOModule(
 
 // ###### Create new IO module ##############################################
 IOModuleBase* IOModuleBase::createIOModule(const std::string&                       moduleName,
-                                           boost::asio::io_service&                 ioService,
+                                           boost::asio::io_context&                 ioContext,
                                            std::map<unsigned short, ResultEntry*>&  resultsMap,
                                            const boost::asio::ip::address&          sourceAddress,
                                            const uint16_t                           sourcePort,
@@ -454,7 +473,7 @@ IOModuleBase* IOModuleBase::createIOModule(const std::string&                   
    for(RegisteredIOModule* registeredIOModule : *IOModuleList) {
       if(registeredIOModule->Name == moduleName) {
          return registeredIOModule->CreateIOModuleFunction(
-                   ioService, resultsMap, sourceAddress, sourcePort, destinationPort,
+                   ioContext, resultsMap, sourceAddress, sourcePort, destinationPort,
                    newResultCallback,
                    packetSize);
       }

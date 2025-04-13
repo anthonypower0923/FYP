@@ -193,11 +193,11 @@ IF (WITH_HIPERCONTRACER)
    INSTALL(FILES       hipercontracer.bib DESTINATION         ${CMAKE_INSTALL_DATADIR}/hipercontracer)
 
    INSTALL(FILES       hipercontracer.bash-completion
-         DESTINATION ${CMAKE_INSTALL_DATADIR}/bash-completion/completions
-         RENAME      hipercontracer)
+           DESTINATION ${CMAKE_INSTALL_DATADIR}/bash-completion/completions
+           RENAME      hipercontracer)
    IF (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-      INSTALL(FILES hipercontracer.service       DESTINATION /lib/systemd/system)
-      INSTALL(FILES hipercontracer@.service      DESTINATION /lib/systemd/system)
+      INSTALL(FILES hipercontracer.service       DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/systemd/system)
+      INSTALL(FILES hipercontracer@.service      DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/systemd/system)
       INSTALL(FILES hipercontracer-12345678.conf DESTINATION /etc/hipercontracer)
    ENDIF()
 ENDIF()
@@ -207,13 +207,13 @@ IF (WITH_TRIGGER)
    ADD_EXECUTABLE(hpct-trigger hpct-trigger.cc)
    TARGET_LINK_LIBRARIES(hpct-trigger libhipercontracer-${libraryType} ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
    INSTALL(TARGETS hpct-trigger RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-   INSTALL(FILES hpct-trigger.1 DESTINATION         ${CMAKE_INSTALL_MANDIR}/man1)
+   INSTALL(FILES       hpct-trigger.1 DESTINATION   ${CMAKE_INSTALL_MANDIR}/man1)
    INSTALL(FILES       hpct-trigger.bash-completion
            DESTINATION ${CMAKE_INSTALL_DATADIR}/bash-completion/completions
            RENAME      hpct-trigger)
    IF (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-      INSTALL(FILES hpct-trigger.service       DESTINATION /lib/systemd/system)
-      INSTALL(FILES hpct-trigger@.service      DESTINATION /lib/systemd/system)
+      INSTALL(FILES hpct-trigger.service       DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/systemd/system)
+      INSTALL(FILES hpct-trigger@.service      DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/systemd/system)
       INSTALL(FILES hpct-trigger-87654321.conf DESTINATION /etc/hipercontracer)
    ENDIF()
 ENDIF()
@@ -227,10 +227,52 @@ IF (WITH_SYNC)
            DESTINATION ${CMAKE_INSTALL_DATADIR}/bash-completion/completions
            RENAME      hpct-sync)
    IF (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-      INSTALL(FILES hpct-sync.service DESTINATION /lib/systemd/system)
-      INSTALL(FILES hpct-sync.timer   DESTINATION /lib/systemd/system)
+      INSTALL(FILES hpct-sync.service DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/systemd/system)
+      INSTALL(FILES hpct-sync.timer   DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/systemd/system)
       INSTALL(FILES hpct-sync.conf    DESTINATION /etc/hipercontracer)
    ENDIF()
+ENDIF()
+
+
+# ====== HiPerConTracer Reverse Tunnel Tool =================================
+IF (WITH_RTUNNEL)
+   INSTALL(PROGRAMS    hpct-rtunnel   DESTINATION ${CMAKE_INSTALL_BINDIR})
+   INSTALL(FILES       hpct-rtunnel.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+   INSTALL(FILES       hpct-rtunnel.bash-completion
+           DESTINATION ${CMAKE_INSTALL_DATADIR}/bash-completion/completions
+           RENAME      hpct-rtunnel)
+   IF (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+      INSTALL(FILES hpct-rtunnel.service  DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/systemd/system)
+   ENDIF()
+ENDIF()
+
+
+# ====== HiPerConTracer Node Tools ==========================================
+IF (WITH_NODE)
+   INSTALL(PROGRAMS    hpct-node-setup   DESTINATION ${CMAKE_INSTALL_BINDIR})
+   INSTALL(FILES       hpct-node-setup.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+   INSTALL(FILES       hpct-node-setup.bash-completion
+           DESTINATION ${CMAKE_INSTALL_DATADIR}/bash-completion/completions
+           RENAME      hpct-node-setup)
+ENDIF()
+
+
+# ====== HiPerConTracer Collector Tools =====================================
+IF (WITH_COLLECTOR)
+   INSTALL(PROGRAMS    hpct-node-removal  DESTINATION ${CMAKE_INSTALL_BINDIR})
+   INSTALL(FILES       hpct-node-removal.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+   INSTALL(FILES       hpct-node-removal.bash-completion
+           DESTINATION ${CMAKE_INSTALL_DATADIR}/bash-completion/completions
+           RENAME      hpct-node-removal)
+
+   INSTALL(PROGRAMS    hpct-nodes-list   DESTINATION ${CMAKE_INSTALL_BINDIR})
+   INSTALL(FILES       hpct-nodes-list.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+
+   INSTALL(PROGRAMS    hpct-ssh          DESTINATION ${CMAKE_INSTALL_BINDIR})
+   INSTALL(FILES       hpct-ssh.1        DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+   INSTALL(FILES       hpct-ssh.bash-completion
+           DESTINATION ${CMAKE_INSTALL_DATADIR}/bash-completion/completions
+           RENAME      hpct-ssh)
 ENDIF()
 
 
@@ -249,7 +291,7 @@ IF (WITH_IMPORTER)
            DESTINATION ${CMAKE_INSTALL_DATADIR}/bash-completion/completions
            RENAME      hpct-importer)
    IF (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-      INSTALL(FILES hpct-importer.service DESTINATION /lib/systemd/system)
+      INSTALL(FILES hpct-importer.service DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/systemd/system)
       INSTALL(FILES hpct-importer.conf    DESTINATION /etc/hipercontracer)
    ENDIF()
 ENDIF()
@@ -280,7 +322,7 @@ ENDIF()
 IF (WITH_VIEWER)
    INSTALL(PROGRAMS    hpct-viewer         DESTINATION ${CMAKE_INSTALL_BINDIR})
    INSTALL(FILES       hpct-viewer.1       DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
-   INSTALL(FILES       hpct-viewer.desktop DESTINATION         ${CMAKE_INSTALL_DATAROOTDIR}/applications)
+   INSTALL(FILES       hpct-viewer.desktop DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications)
    INSTALL(FILES       hpct-viewer.bash-completion
            DESTINATION ${CMAKE_INSTALL_DATADIR}/bash-completion/completions
            RENAME      hpct-viewer)
@@ -326,7 +368,7 @@ IF (WITH_UDP_ECHO_SERVER)
            DESTINATION ${CMAKE_INSTALL_DATADIR}/bash-completion/completions
            RENAME      udp-echo-server)
    IF (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-      INSTALL(FILES udp-echo-server.service DESTINATION /lib/systemd/system)
+      INSTALL(FILES udp-echo-server.service DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/systemd/system)
       INSTALL(FILES udp-echo-server.conf    DESTINATION /etc/hipercontracer)
    ENDIF()
 ENDIF()
@@ -341,6 +383,8 @@ INSTALL(FILES get-default-ips.1
 # ====== TEST ONLY ==========================================================
 # ADD_EXECUTABLE(t1 t1.cc)
 # TARGET_LINK_LIBRARIES(t1 ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+# ADD_EXECUTABLE(t2 t2.cc)
+# TARGET_LINK_LIBRARIES(t2 ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 # ADD_EXECUTABLE(dbtest dbtest.cc)
 # TARGET_LINK_LIBRARIES(dbtest libuniversalimporter-${libraryType} ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
