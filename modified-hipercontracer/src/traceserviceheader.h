@@ -130,7 +130,7 @@ class TraceServiceHeader
       // NOTE: HiPerConTracer 1.x used microseconds here. Simple heuristic:
       // < 2*32*1e6: HiPerConTracer 1.x in microseconds
       // Otherwise:  HiPerConTracer 2.x in nanoseconds
-      sendTimeStamp(std::chrono::duration_cast<std::chrono::microseconds>(
+      sendTimeStamp(std::chrono::duration_cast<std::chrono::miliseconds>(
                        timeStamp - HiPerConTracerEpoch).count());
    }
 
