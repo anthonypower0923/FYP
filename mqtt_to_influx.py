@@ -13,20 +13,21 @@ This script receives MQTT data and saves those to InfluxDB.
 
 import re
 from typing import NamedTuple
+import os
 
 import paho.mqtt.client as mqtt
 from influxdb import InfluxDBClient
 
-INFLUXDB_ADDRESS = '10.10.10.247'
-INFLUXDB_USER = 'iotuser'
-INFLUXDB_PASSWORD = 'iotpassword'
-INFLUXDB_DATABASE = 'homeiot_db'
+INFLUXDB_ADDRESS = '87.44.27.48'
+INFLUXDB_USER = 'influx'
+INFLUXDB_PASSWORD = os.environ['INFLUX_TOKEN']
+INFLUXDB_DATABASE = 'bandwidth'
 
-MQTT_ADDRESS = '10.10.10.247'
+MQTT_ADDRESS = '87.44.27.48'
 MQTT_USER = 'iotuser'
 MQTT_PASSWORD = 'iotpassword'
-MQTT_TOPIC = 'home/+/+'  # [room]/[temperature|humidity|light|status]
-MQTT_REGEX = 'home/([^/]+)/([^/]+)'
+MQTT_TOPIC = 'bandwidth/+/+'  # [room]/[temperature|humidity|light|status]
+MQTT_REGEX = 'bandwidth/([^/]+)/([^/]+)'
 MQTT_CLIENT_ID = 'MQTTInfluxDBBridge'
 
 influxdb_client = InfluxDBClient(INFLUXDB_ADDRESS, 8086, INFLUXDB_USER, INFLUXDB_PASSWORD, None)
@@ -91,7 +92,7 @@ def main():
     _init_influxdb_database()
 
     mqtt_client = mqtt.Client(MQTT_CLIENT_ID)
-    mqtt_client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
+    # mqtt_client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
     mqtt_client.on_connect = on_connect
     mqtt_client.on_message = on_message
 
