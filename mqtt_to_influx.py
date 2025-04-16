@@ -30,7 +30,7 @@ MQTT_TOPIC = 'bandwidth/+/+'  # [room]/[temperature|humidity|light|status]
 MQTT_REGEX = 'bandwidth/([^/]+)/([^/]+)'
 MQTT_CLIENT_ID = 'MQTTInfluxDBBridge'
 
-influxdb_client = InfluxDBClient(INFLUXDB_ADDRESS, 8086, INFLUXDB_USER, INFLUXDB_PASSWORD, None)
+influxdb_client = InfluxDBClient.from_env_properties()
 
 
 class NetworkData(NamedTuple):
