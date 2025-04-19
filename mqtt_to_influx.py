@@ -16,12 +16,12 @@ from typing import NamedTuple
 import os
 
 import paho.mqtt.client as mqtt
-from influxdb import InfluxDBClient
+import influxdb_client
+from influxdb_client.client.write_api import SYNCHRONOUS
 
 INFLUXDB_ADDRESS = '87.44.27.48'
-INFLUXDB_USER = 'influx'
-INFLUXDB_PASSWORD = os.environ['INFLUX_TOKEN']
-INFLUXDB_DATABASE = 'bandwidth'
+INFLUXDB_BUCKET = 'bandwidth'
+INFLUXDB_TOKEN = os.environ['INFLUX_TOKEN']
 
 MQTT_ADDRESS = '87.44.27.48'
 MQTT_USER = 'iotuser'
@@ -30,7 +30,7 @@ MQTT_TOPIC = 'bandwidth/+/+'  # [room]/[temperature|humidity|light|status]
 MQTT_REGEX = 'bandwidth/([^/]+)/([^/]+)'
 MQTT_CLIENT_ID = 'MQTTInfluxDBBridge'
 
-influxdb_client = InfluxDBClient.from_env_properties()
+influxdb_client = influxdb_client.InfluxDBClient(url='http://localhost:8086',token=INFLUXDB_TOKEN,org=my-org)
 
 
 class NetworkData(NamedTuple):
@@ -78,18 +78,21 @@ def _send_sensor_data_to_influxdb(network_data):
         }
     ]
     print (json_body)
+    write_api = influxdb_client.write_api(write_options=SYNCHRONOUS)
+    p = influxdb_client.Point(network_data.measurement).tag("network", network_data.location).field(network_data.value)
+    write_api.write(bucket=INFLUXDB_BUCKET, org='my-org', record=p)
     influxdb_client.write_points(json_body)
 
 
-def _init_influxdb_database():
-    databases = influxdb_client.get_list_database()
-    if len(list(filter(lambda x: x['name'] == INFLUXDB_DATABASE, databases))) == 0:
-        influxdb_client.create_database(INFLUXDB_DATABASE)
-    influxdb_client.switch_database(INFLUXDB_DATABASE)
+# def _init_influxdb_database():
+#     databases = influxdb_client.get_list_database()
+#     if len(list(filter(lambda x: x['name'] == INFLUXDB_DATABASE, databases))) == 0:
+#         influxdb_client.create_database(INFLUXDB_DATABASE)
+#     influxdb_client.switch_database(INFLUXDB_DATABASE)
 
 
 def main():
-    _init_influxdb_database()
+    # _init_influxdb_database()
 
     mqtt_client = mqtt.Client(MQTT_CLIENT_ID)
     # mqtt_client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
