@@ -1,6 +1,6 @@
 ### HiPerConTracer Usage
 
-Program is used the exact same as the original, documentation can be found for here https://github.com/dreibh/hipercontracer
+Program is used the exact same as the original, documentation can be found for here https://github.com/anthonypower0923/FYP/blob/main/modified-hipercontracer/README.md
 
 ### Detection Script Usage
 

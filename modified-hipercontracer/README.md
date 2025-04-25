@@ -5,6 +5,39 @@
  </a>
 </p>
 
+# Building Program From Source
+
+Note: All instruction are for Linux
+
+### Install CMAKE >= 3.0 and Boost
+
+apt-get install -y cmake && apt-get install -y build-essential
+apt-get install -y boost
+
+### Install Required Packages
+
+apt-get install build-essential
+apt-get install libboost-all-dev
+apt-get install -y libbz2-dev
+apt-get install -y liblzma-dev
+apt-get install -y libssl-dev
+apt-get install -y libmariadb-dev
+apt-get install -y libpqxx-dev
+apt-get install -y libmongoc-dev
+apt-get install -y ghostscript
+apt-get install -y pdf2svg
+apt-get install -y graphicsmagick
+
+### Building program
+
+git clone https://github.com/anthonypower0923/FYP.git
+
+cd modified-hipercontracer
+
+cmake .
+
+make
+
 # What is High-Performance Connectivity Tracer&nbsp;(HiPerConTracer)?
 
 High-Performance Connectivity Tracer&nbsp;(HiPerConTracer) is a Ping/Traceroute measurement framework.
