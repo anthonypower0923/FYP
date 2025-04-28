@@ -81,12 +81,13 @@ do
         fi
         PPS_OUTPUT=$(printf "  TX: %10s pkts/s   RX: %10s pkts/s   TOTAL: %10s pkts/s" $FORMATTED_TXPPS $FORMATTED_RXPPS $FORMATTED_TOPPS)
         AVG_OUTPUT=$(printf "  TX: %'10d bytes    RX: %'10d bytes    [Avg packet size]" $(( TXP == 0 ? 0 : (TXB + TXP/2) / TXP)) $(( RXP == 0 ? 0 : (RXB + RXP/2) / RXP )))
-
+ 
         printf "\n${BPS_OUTPUT}\n${PPS_OUTPUT}\n${AVG_OUTPUT}\n"
         printf "\n${FORMATTED_TXPPS}\n${FORMATTED_RXPPS}\n${FORMATTED_TOPPS}\n"
-        mosquitto_pub -h 87.44.27.47:1883 -t bandwidth/control/TX -m $FORMATTED_TXPPS
-        mosquitto_pub -h 87.44.27.47:1883 -t bandwidth/control/RX -m $FORMATTED_RXPPS
-        mosquitto_pub -h 87.44.27.47:1883 -t bandwidth/control/TOTAL -m $FORMATTED_TOPPS
+ # Uncomment to push to MQTT (requires mosquitto MQTT client)
+        # mosquitto_pub -h 87.44.27.47:1883 -t bandwidth/control/TX -m $FORMATTED_TXPPS
+        # mosquitto_pub -h 87.44.27.47:1883 -t bandwidth/control/RX -m $FORMATTED_RXPPS
+        # mosquitto_pub -h 87.44.27.47:1883 -t bandwidth/control/TOTAL -m $FORMATTED_TOPPS
 
 
 done
